@@ -1,0 +1,21 @@
+name: ml-graphs
+channels:
+  - conda-forge
+  - pytorch
+dependencies:
+  - python=3.9
+  - pip
+  - numpy
+  - pandas
+  - matplotlib
+  - jupyter
+  - pytorch
+  - cudatoolkit=11.6
+  - pip:
+      - --find-links https://data.pyg.org/whl/torch-1.12.0+cpu.html
+      - torch-scatter
+      - torch-sparse
+      - torch-cluster
+      - torch-spline-conv
+      - torch-geometric
+      - networkx # graph visualization
