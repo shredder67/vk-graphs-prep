@@ -10,9 +10,9 @@ dependencies:
   - matplotlib
   - jupyter
   - pytorch
-  - cudatoolkit=11.6
+  - cudatoolkit=11.6 # и здесь выбери нужную версию
   - pip:
-      - -f https://data.pyg.org/whl/torch-1.12.0+cu116.html
+      - -f https://data.pyg.org/whl/torch-1.12.0+cu116.html # подставь сюда нужную ссылку
       - torch-scatter
       - torch-sparse
       - torch-cluster
