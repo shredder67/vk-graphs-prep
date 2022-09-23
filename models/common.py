@@ -18,14 +18,14 @@ def train_model(
         optimizer: torch.optim.Optimizer,
         data: torch_geometric.data.Dataset,
         epochs=1000,
-        eval_freq=100,
         log_stats=True,
         device=torch.device('cuda')):
     
     model.train()
     f1score = F1Score().to(device) 
-    loss_hist = []
-    f1_hist = []
+    train_loss_hist = []
+    val_loss_hist = []
+    f1_train_hist = []
     f1_val_hist = []
     with tqdm(range(1, epochs + 1)) as tepoch:
         for e in tepoch:
@@ -36,39 +36,42 @@ def train_model(
             loss.backward()
             optimizer.step()
 
-            loss_hist.append(loss.item())
-            f1_hist.append(f1score(preds[data.train_mask], data.y[data.train_mask].to(torch.int)).item())
+            train_loss_hist.append(loss.item())
+            f1_train_hist.append(f1score(preds[data.train_mask], data.y[data.train_mask].to(torch.int)).item())
+            metric_dict, val_loss = eval_model(model, data, criterion=criterion, metrics={"f1": f1score}, device=device)
+            val_loss_hist.append(val_loss)
+            f1_val_hist.append(metric_dict["f1"])
+            if log_stats:
+                    tepoch.write(f'\nepoch {e}:\ntr_loss {train_loss_hist[-1]:.4f}\ntr_f1: {f1_train_hist[-1]:.4f} \
+                                    \nval_loss: {val_loss_hist[-1]:.4f} \n val_f1: {f1_val_hist[-1]:.4f}')
 
-            if e%eval_freq == 0:
-                f1_val_hist.append(
-                    eval_model(model, data, {"acc": f1score}, device=device)["acc"]
-                )
-                if log_stats:
-                    tepoch.write(f'\nepoch {e}:\ntr_loss {loss_hist[-1]:.4f}\ntr_f1: {f1_hist[-1]:.4f} \
-                                    \nval_f1: {f1_val_hist[-1]:.4f}')
-
-    return loss_hist, f1_hist, f1_val_hist
+    return train_loss_hist, f1_train_hist, val_loss_hist, f1_val_hist
 
 
 @torch.no_grad()
-def eval_model(model, data, metrics: dict, use_val_mask=True, device=torch.device('cuda')):
+def eval_model(model, data, metrics: dict, criterion, use_val_mask=True, device=torch.device('cuda')):
     model.eval()
     mask = data.val_mask if use_val_mask else data.test_mask
     out = model(data).squeeze(-1)
+    y_true = data.y[mask]
+    
+    loss = criterion(out[mask], y_true).item()
+    
     preds = torch.sigmoid(out)
-    y_true = data.y[mask].to(torch.int)
     metric_values = dict()
     for metric_key, metric in metrics.items():
-        metric_values[metric_key] = metric(preds[mask], y_true).item()
-    return metric_values
+        metric_values[metric_key] = metric(preds[mask], y_true.to(torch.int)).item()
+    return metric_values, loss
 
 
-def plot_hist(train_loss_hist, train_acc_hist, eval_acc_hist, eval_freq):
+def plot_hist(train_hist):
+    train_loss_hist, f1_train_hist, val_loss_hist, f1_val_hist = train_hist
     _, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
     ax1.plot(train_loss_hist, label='train loss')
-    ax1.set_title('Training Loss')
-    ax2.plot(train_acc_hist, label='train f1-score')
-    ax2.plot(list(range(0, len(train_acc_hist), eval_freq)), eval_acc_hist, label='eval f1-score')
+    ax1.plot(val_loss_hist, label='val loss')
+    ax1.set_title('Loss plots')
+    ax2.plot(f1_train_hist, label='train f1-score')
+    ax2.plot(f1_val_hist, label='val f1-score')
     ax2.set_title('Training and Validation Metric (F1-Score)')
     plt.legend()
     plt.show()
